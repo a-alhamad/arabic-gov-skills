@@ -1,6 +1,6 @@
 {
   "name": "a-alhamad-skills",
-  "description": "Skills for producing formal Arabic documents: strict RTL, hidden-character and AI-trace cleanup, and formal memo drafting.",
+  "description": "Skills for formal Arabic writing, document hygiene (strict RTL, hidden-character and AI-trace cleanup) and design workflow.",
   "owner": {
     "name": "Alaa Al-Hamad"
   },

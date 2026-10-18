@@ -1,5 +1,6 @@
 {
   "name": "arabic-gov-skills",
+  "version": "1.2.0",
   "description": "Arabic formal writing, document hygiene and design workflow skills.",
   "author": {
     "name": "Alaa Al-Hamad"
