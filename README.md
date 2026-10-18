@@ -9,11 +9,12 @@
 | `arabic-rtl-docs` | ضبط اتجاه RTL في Word وPowerPoint وHTML، وإزالة الرموز غير المرئية وبقايا تنسيق المحادثة وبيانات التعريف الدالة على أداة التوليد، والإبلاغ عن العلامات المرئية والحروف الشبيهة، وعزل المصطلحات الإنجليزية داخل النص العربي |
 | `formal-writing-ar` | أسلوب الكتابة الرسمية والمهنية لكل المستندات: المقترحات والتقارير والخطط وتقارير التقييم والمذكرات ونصوص العروض. يحكم التسلسل والتوثيق ومنع الحشو والاختلاق ودقة السند |
 | `arabic-design-workflow` | ينظّم مهارات التصميم والتخطيط والمراجعة لكل مخرَج بصري: العروض، والملصقات، وصفحات HTML، والواجهات، ولوحات المؤشرات، وتصاميم Canva، تحت ضوابط RTL وعدم وضع نص داخل الصور |
+| `document-pattern-analysis` | تفكيك مستند أو عرض نموذجي إلى بنيته ووظيفة أقسامه ومسار حجته وأسلوبه، واستخلاص قالب وقائمة مراجعة لإعادة الاستخدام دون نسخ النص |
 | `formal-memo-ar` | ما يخص المذكرات الداخلية وحدها: الافتتاح المرجعي، وحسم غرض المذكرة، والألقاب. تعمل مع `formal-writing-ar` |
 
 ## التثبيت
 
-المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي أربع مهارات.
+المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي خمس مهارات.
 
 ### في Claude (المحادثة)
 1. **Customize** ثم **Plugins** ثم **Add** ثم **Add marketplace**.
@@ -36,6 +37,7 @@ plugins/arabic-gov-skills/
   .claude-plugin/plugin.json
   skills/arabic-design-workflow/
   skills/arabic-rtl-docs/
+  skills/document-pattern-analysis/
   skills/formal-memo-ar/
   skills/formal-writing-ar/
 ```
@@ -63,6 +65,9 @@ python3 -m unittest discover -s tests -v
 # إثبات أن الاختبارات قادرة على كشف الأعطال: تُعطَّل الأداة عمدًا 15 مرة، ويجب أن تُكشف كل مرة
 python3 tests/mutation_check.py
 ```
+
+## محتوى من أطراف أخرى
+قائمة الحد الأدنى لجودة التصميم مقتبسة بتصرف من مستودع impeccable بترخيص Apache 2.0. التفاصيل ونص الترخيص في `THIRD_PARTY_NOTICES.md`.
 
 ## مبادئ المستودع
 - عند كل تعديل على المهارات يُرفع رقم الإصدار في `plugins/arabic-gov-skills/.claude-plugin/plugin.json`، وإلا لا يصل التعديل إلى الإضافة المثبتة.
