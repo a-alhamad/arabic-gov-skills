@@ -7,6 +7,9 @@ Three layers are checked:
      marks, em dash, ellipsis character)  -> reported only, never auto-removed
   3. File metadata / generator signatures (docx/pptx/xlsx properties, HTML
      generator meta tag)
+  4. Leftover Markdown from chat output (bold markers, headings, list markers)
+  5. Lookalike and compatibility forms (Arabic presentation forms, fullwidth
+     Latin, Farsi yeh/keheh, tatweel, mixed-script words)
 
 Supports: .docx, .pptx, .xlsx, .html, .htm, .md, .txt, .xml
 
@@ -22,6 +25,7 @@ file itself contains no hidden characters.
 """
 import re
 import sys
+import unicodedata
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -98,6 +102,30 @@ VISIBLE_RANGES = [
     (0x2700, 0x27BF, "DINGBAT"),
     (0x1F300, 0x1FAFF, "EMOJI"),
 ]
+# ---------- Layer 5: lookalike and compatibility forms ----------
+NORMALIZE_RANGES = [
+    (0xFB50, 0xFDFF, "ARABIC PRESENTATION FORM-A"),
+    (0xFE70, 0xFEFE, "ARABIC PRESENTATION FORM-B"),
+    (0xFF01, 0xFF5E, "FULLWIDTH FORM"),
+]
+LOOKALIKE = {
+    0x06CC: "FARSI YEH (Arabic uses U+064A or U+0649)",
+    0x06A9: "KEHEH (Arabic uses U+0643)",
+    0x0640: "TATWEEL",
+}
+_LATIN = "A-Za-z"
+_GREEK_CYR = chr(0x0370) + "-" + chr(0x03FF) + chr(0x0400) + "-" + chr(0x04FF)
+WORD_RE = re.compile("[" + _LATIN + _GREEK_CYR + "]+")
+LATIN_RE = re.compile("[" + _LATIN + "]")
+GREEK_CYR_RE = re.compile("[" + _GREEK_CYR + "]")
+
+# ---------- Layer 4: leftover Markdown ----------
+MD_BOLD = re.compile(r"\*\*|__")
+MD_HEADING = re.compile(r"^[ \t]*#{1,6}[ \t]+", re.M)
+MD_BULLET = re.compile(r"^[ \t]*[-*+][ \t]+", re.M)
+MD_RULE = re.compile(r"^[ \t]*(-{3,}|\*{3,}|_{3,})[ \t]*\n?", re.M)
+XML_TEXT = re.compile(r">([^<]*)<")
+
 # Only text-bearing parts are scanned for visible marks; numbering/styles
 # parts legitimately hold bullet glyphs.
 TEXT_PARTS = re.compile(
@@ -137,6 +165,11 @@ def classify(ch):
         return "replace", REPLACE[cp][1]
     if cp in REPORT_INVISIBLE:
         return "review", REPORT_INVISIBLE[cp]
+    name = _in_ranges(cp, NORMALIZE_RANGES)
+    if name:
+        return "normalize", name
+    if cp in LOOKALIKE:
+        return "lookalike", LOOKALIKE[cp]
     if cp in VISIBLE:
         return "visible", VISIBLE[cp]
     name = _in_ranges(cp, VISIBLE_RANGES)
@@ -145,21 +178,30 @@ def classify(ch):
     return None
 
 
+TEXT_ONLY_KINDS = ("visible", "normalize", "lookalike")
+
+
 def scan(text, visible=True):
+    """visible=False (non-text parts such as styles and fonts) limits the scan
+    to invisible characters, so font names and style ids are never touched."""
     found = Counter()
     for ch in text:
         c = classify(ch)
-        if c and (visible or c[0] != "visible"):
+        if c and (visible or c[0] not in TEXT_ONLY_KINDS):
             found[(c[0], ord(ch), c[1])] += 1
     return found
 
 
-def clean(text):
+def clean(text, text_part=True):
     out = []
     for ch in text:
         c = classify(ch)
-        if c is None or c[0] in ("review", "visible"):
+        if c is None or c[0] in ("review", "visible", "lookalike"):
             out.append(ch)
+        elif c[0] == "normalize" and not text_part:
+            out.append(ch)
+        elif c[0] == "normalize":
+            out.append(unicodedata.normalize("NFKC", ch))
         elif c[0] == "replace":
             out.append(REPLACE[ord(ch)][0])
     return "".join(out)
@@ -183,12 +225,43 @@ def clean_meta(xml):
     return META_FIELDS.sub(sub, xml)
 
 
-def report(chars, meta):
-    order = {"remove": 0, "replace": 1, "review": 2, "visible": 3}
+def mixed_script_words(text):
+    return [w for w in WORD_RE.findall(text) if LATIN_RE.search(w) and GREEK_CYR_RE.search(w)]
+
+
+def md_scan_plain(text):
+    return Counter({
+        "bold markers (** or __)": len(MD_BOLD.findall(text)),
+        "heading markers (#)": len(MD_HEADING.findall(text)),
+        "list markers (- * +)": len(MD_BULLET.findall(text)),
+        "horizontal rules": len(MD_RULE.findall(text)),
+    }) + Counter()
+
+
+def md_clean_plain(text):
+    text = MD_RULE.sub("", text)
+    text = MD_HEADING.sub("", text)
+    text = MD_BULLET.sub("", text)
+    return MD_BOLD.sub("", text)
+
+
+def md_scan_xml(xml):
+    n = sum(len(MD_BOLD.findall(m.group(1))) for m in XML_TEXT.finditer(xml))
+    return Counter({"bold markers (** or __)": n}) + Counter()
+
+
+def md_clean_xml(xml):
+    return XML_TEXT.sub(lambda m: ">" + MD_BOLD.sub("", m.group(1)) + "<", xml)
+
+
+def report(chars, meta, md, words):
+    order = {"remove": 0, "replace": 1, "normalize": 2, "review": 3, "lookalike": 4, "visible": 5}
     labels = {
         "remove": "remove",
         "replace": "replace",
         "review": "review manually",
+        "normalize": "normalize (NFKC)",
+        "lookalike": "lookalike, review manually",
         "visible": "visible mark, review manually",
     }
     for (kind, cp, name), n in sorted(chars.items(), key=lambda x: (order[x[0][0]], x[0][1])):
@@ -196,6 +269,10 @@ def report(chars, meta):
     for flag, tag, value in meta:
         mark = "GENERATOR SIGNATURE -> cleared by --fix" if flag == "generator" else "metadata, review"
         print(f"  meta  {tag} = {value!r} -> {mark}")
+    for label, n in md.items():
+        print(f"{n:>6}  MARKDOWN {label} -> removed by --fix")
+    for w in sorted(set(words)):
+        print(f"  word  {w!r} mixes Latin with Greek/Cyrillic letters -> review manually")
 
 
 def main():
@@ -205,7 +282,7 @@ def main():
     path = Path(sys.argv[1])
     fix = "--fix" in sys.argv[2:]
     ext = path.suffix.lower()
-    chars, meta = Counter(), []
+    chars, meta, md, words = Counter(), [], Counter(), []
     out = path.with_name(f"{path.stem}_clean{path.suffix}")
 
     if ext in {".docx", ".pptx", ".xlsx"}:
@@ -218,11 +295,17 @@ def main():
                 new[name] = raw
                 continue
             text = raw.decode("utf-8")
-            chars += scan(text, visible=bool(TEXT_PARTS.match(name)))
+            is_text = bool(TEXT_PARTS.match(name))
+            chars += scan(text, visible=is_text)
+            if is_text:
+                md += md_scan_xml(text)
+                words += mixed_script_words(" ".join(XML_TEXT.findall(text)))
             if name in ("docProps/core.xml", "docProps/app.xml"):
                 meta += scan_meta(text)
             if fix:
-                text = clean(text)
+                text = clean(text, text_part=is_text)
+                if is_text:
+                    text = md_clean_xml(text)
                 if name in ("docProps/core.xml", "docProps/app.xml"):
                     text = clean_meta(text)
                 new[name] = text.encode("utf-8")
@@ -235,12 +318,18 @@ def main():
     elif ext in {".html", ".htm", ".md", ".txt", ".xml"}:
         text = path.read_text(encoding="utf-8")
         chars = scan(text)
+        words = mixed_script_words(text)
+        is_plain = ext == ".txt"
+        if is_plain:
+            md = md_scan_plain(text)
         is_html = ext in {".html", ".htm"}
         if is_html:
             for m in HTML_GENERATOR.finditer(text):
                 meta.append(("generator", "meta generator", m.group(0).strip()))
         if fix:
             text = clean(text)
+            if is_plain:
+                text = md_clean_plain(text)
             if is_html:
                 text = HTML_GENERATOR.sub("", text)
             out.write_text(text, encoding="utf-8")
@@ -248,15 +337,17 @@ def main():
         print(f"Unsupported file type: {ext}")
         return 2
 
-    if not chars and not meta:
-        print("Clean: no hidden characters, decorative marks or generator metadata found.")
+    if not chars and not meta and not md and not words:
+        print("Clean: no hidden characters, decorative marks, leftover Markdown or generator metadata found.")
     else:
-        report(chars, meta)
+        report(chars, meta, md, words)
     if fix:
         print(f"Cleaned copy written: {out}")
         return 0
-    blocking = any(k[0] in ("remove", "replace") for k in chars) or any(
-        f == "generator" for f, _, _ in meta
+    blocking = (
+        any(k[0] in ("remove", "replace", "normalize") for k in chars)
+        or any(f == "generator" for f, _, _ in meta)
+        or bool(md)
     )
     return 1 if blocking else 0
 

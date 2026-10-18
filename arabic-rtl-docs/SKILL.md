@@ -1,6 +1,6 @@
 ---
 name: arabic-rtl-docs
-description: Use when producing or fixing formal Arabic documents in Word (.docx), PowerPoint (.pptx) or HTML. Enforces strict RTL layout, removes hidden Unicode characters, flags visible decorative marks and generator metadata, and renders mixed Arabic/English technical terms (ISSAI, GUID, INTOSAI) without direction conflicts.
+description: Use when producing or fixing formal Arabic documents in Word (.docx), PowerPoint (.pptx) or HTML. Enforces strict RTL layout, removes hidden Unicode characters, strips leftover chat Markdown, normalizes lookalike characters, flags visible decorative marks and generator metadata, and renders mixed Arabic/English technical terms (ISSAI, GUID, INTOSAI) without direction conflicts.
 ---
 
 # ضبط المستندات العربية الرسمية
@@ -51,7 +51,29 @@ description: Use when producing or fixing formal Arabic documents in Word (.docx
 - يُحذف وسم `<meta name="generator">` من ملفات HTML.
 - يُدخل اسم المؤلف الصحيح يدويًا من Word بعد التنظيف، إن لزم.
 
-### ٥. المصطلحات المختلطة (عربي/إنجليزي)
+### ٥. بقايا تنسيق Markdown
+النص المنسوخ من واجهات المحادثة قد يحمل علامات تنسيق مرئية لم تُعرض. هذه علامات تنسيق، وليست علامات مائية.
+
+| العلامة | الإجراء |
+|---|---|
+| النجمة المزدوجة أو الشرطتان السفليتان للخط العريض | حذف آلي في الملفات النصية ونصوص Word وPowerPoint |
+| علامات العناوين (#) والتعداد (- و* و+) والفواصل الأفقية | حذف آلي في الملفات النصية (.txt) فقط |
+| النجمة المفردة | تبقى، لأنها قد تكون إحالة إلى حاشية |
+
+لا تُطبق هذه المعالجة على ملفات .md، لأن التنسيق فيها مقصود.
+
+### ٦. الحروف الشبيهة وأشكال التوافق
+| الفئة | الإجراء |
+|---|---|
+| أشكال العرض العربية (U+FB50 إلى U+FDFF، U+FE70 إلى U+FEFE) | توحيد إلى الحروف الأساسية (NFKC) |
+| الحروف اللاتينية العريضة (U+FF01 إلى U+FF5E) | توحيد إلى الحروف العادية |
+| الياء الفارسية (U+06CC) والكاف الفارسية (U+06A9) | إبلاغ للمراجعة، لأن البديل العربي يختلف بحسب الموضع |
+| حرف التطويل (U+0640) | إبلاغ للمراجعة، لأن له استخدامًا مشروعًا مثل "بـ" |
+| كلمة تجمع حروفًا لاتينية وكيريلية أو يونانية (مثل ISSAI بحرف A كيريلي) | إبلاغ للمراجعة |
+
+يقتصر التوحيد على أجزاء النص في ملفات Word وPowerPoint، ولا يمس أسماء الخطوط والأنماط.
+
+### ٧. المصطلحات المختلطة (عربي/إنجليزي)
 - يُعزل المصطلح الإنجليزي **بنيويًا** لا برموز اتجاه:
   - Word: مقطع (run) مستقل بلغة `w:val="en-US"` دون `<w:rtl/>`.
   - HTML: `<bdi>ISSAI 100</bdi>` أو `<span dir="ltr">`.
@@ -65,6 +87,13 @@ description: Use when producing or fixing formal Arabic documents in Word (.docx
 2. معالجة ما أبلغت عنه الأداة من علامات مرئية بإعادة الصياغة، ثم إعادة الفحص حتى تكون النتيجة نظيفة.
 3. فتح المستند ومراجعة الصفحات التي تحتوي مصطلحات مختلطة أو جداول، والتأكد من أن الجداول تبدأ من اليمين.
 4. تشغيل الفحص بعد آخر تعديل يدوي، لأن خاصية التنصيص الذكي في Word قد تعيد العلامات المنحنية.
+
+## ممارسات مرفوضة
+| الممارسة | سبب الرفض |
+|---|---|
+| لصق المستندات في مواقع تنظيف أو "أنسنة" خارجية | نقل محتوى رسمي إلى طرف ثالث دون ضمانات سرية؛ والتنظيف ممكن محليًا بهذه الأداة |
+| أدوات "الأنسنة" الآلية | تعيد صياغة النص دون رقابة على المعنى، فقد تغيّر الوقائع أو المصطلحات أو السند النظامي |
+| معالجة الأسلوب بأداة رموز | الأسلوب يُعالج بقواعد الصياغة والمراجعة البشرية، لا بحذف الرموز |
 
 ## حدود الأداة
 - تعمل على مستوى الرموز وبيانات الملف فقط.
