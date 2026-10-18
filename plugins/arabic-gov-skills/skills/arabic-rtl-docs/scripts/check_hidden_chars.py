@@ -275,7 +275,7 @@ def report(chars, meta, md, words):
         print(f"  word  {w!r} mixes Latin with Greek/Cyrillic letters -> review manually")
 
 
-def main():
+def _main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
@@ -350,6 +350,20 @@ def main():
         or bool(md)
     )
     return 1 if blocking else 0
+
+
+def main():
+    if len(sys.argv) >= 2 and not Path(sys.argv[1]).is_file():
+        print(f"File not found: {sys.argv[1]}")
+        return 2
+    try:
+        return _main()
+    except UnicodeDecodeError:
+        print("File is not UTF-8 encoded: save it as UTF-8 and retry")
+        return 2
+    except zipfile.BadZipFile:
+        print("File is not a valid .docx/.pptx/.xlsx archive (corrupt or password-protected)")
+        return 2
 
 
 if __name__ == "__main__":
