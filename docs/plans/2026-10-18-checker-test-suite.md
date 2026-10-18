@@ -8,7 +8,7 @@
 
 **التقنيات:** Python 3 ومكتبتها القياسية فقط (`unittest`، `zipfile`، `subprocess`، `tempfile`). لا اعتماديات خارجية.
 
-**المواصفة:** `arabic-rtl-docs/SKILL.md` (الأقسام ٢ إلى ٦، وخطوات التحقق، وحدود الأداة).
+**المواصفة:** `plugins/arabic-gov-skills/skills/arabic-rtl-docs/SKILL.md` (الأقسام ٢ إلى ٦، وخطوات التحقق، وحدود الأداة).
 
 ## القيود العامة
 - لا مكتبات خارجية؛ تعمل الاختبارات بأمر واحد: `python3 -m unittest discover -s tests -v`
@@ -99,7 +99,7 @@
 
 **الملفات:**
 - إنشاء: `tests/test_bad_inputs.py`
-- تعديل: `arabic-rtl-docs/scripts/check_hidden_chars.py` في الدالة `main()`
+- تعديل: `plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_chars.py` في الدالة `main()`
 
 **الواجهات:** تستهلك `run_cli` و`make_office` و`tmpdir`.
 
