@@ -235,10 +235,15 @@ def main():
     elif ext in {".html", ".htm", ".md", ".txt", ".xml"}:
         text = path.read_text(encoding="utf-8")
         chars = scan(text)
-        for m in HTML_GENERATOR.finditer(text):
-            meta.append(("generator", "meta generator", m.group(0).strip()))
+        is_html = ext in {".html", ".htm"}
+        if is_html:
+            for m in HTML_GENERATOR.finditer(text):
+                meta.append(("generator", "meta generator", m.group(0).strip()))
         if fix:
-            out.write_text(HTML_GENERATOR.sub("", clean(text)), encoding="utf-8")
+            text = clean(text)
+            if is_html:
+                text = HTML_GENERATOR.sub("", text)
+            out.write_text(text, encoding="utf-8")
     else:
         print(f"Unsupported file type: {ext}")
         return 2
