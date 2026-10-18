@@ -27,6 +27,7 @@ import re
 import sys
 import unicodedata
 import zipfile
+import zlib
 from collections import Counter
 from pathlib import Path
 
@@ -275,20 +276,35 @@ def report(chars, meta, md, words):
         print(f"  word  {w!r} mixes Latin with Greek/Cyrillic letters -> review manually")
 
 
+BAD_ARCHIVE = "File is not a valid .docx/.pptx/.xlsx archive (corrupt or password-protected)"
+
+
+def _path_arg():
+    """First argument that is not an option, so --fix may come before or after the path."""
+    for a in sys.argv[1:]:
+        if not a.startswith("--"):
+            return a
+    return None
+
+
 def _main():
-    if len(sys.argv) < 2:
+    if _path_arg() is None:
         print(__doc__)
         return 2
-    path = Path(sys.argv[1])
-    fix = "--fix" in sys.argv[2:]
+    path = Path(_path_arg())
+    fix = "--fix" in sys.argv[1:]
     ext = path.suffix.lower()
     chars, meta, md, words = Counter(), [], Counter(), []
     out = path.with_name(f"{path.stem}_clean{path.suffix}")
 
     if ext in {".docx", ".pptx", ".xlsx"}:
-        with zipfile.ZipFile(path) as zin:
-            infos = zin.infolist()
-            data = {i.filename: zin.read(i.filename) for i in infos}
+        try:
+            with zipfile.ZipFile(path) as zin:
+                infos = zin.infolist()
+                data = {i.filename: zin.read(i.filename) for i in infos}
+        except (zipfile.BadZipFile, zlib.error, RuntimeError, EOFError, NotImplementedError):
+            print(BAD_ARCHIVE)
+            return 2
         new = {}
         for name, raw in data.items():
             if not name.endswith((".xml", ".rels")):
@@ -353,16 +369,14 @@ def _main():
 
 
 def main():
-    if len(sys.argv) >= 2 and not Path(sys.argv[1]).is_file():
-        print(f"File not found: {sys.argv[1]}")
+    arg = _path_arg()
+    if arg is not None and not Path(arg).is_file():
+        print(f"File not found: {arg}")
         return 2
     try:
         return _main()
     except UnicodeDecodeError:
         print("File is not UTF-8 encoded: save it as UTF-8 and retry")
-        return 2
-    except zipfile.BadZipFile:
-        print("File is not a valid .docx/.pptx/.xlsx archive (corrupt or password-protected)")
         return 2
 
 
