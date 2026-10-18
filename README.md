@@ -50,6 +50,18 @@ python3 plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_ch
 
 الصيغ المدعومة: `.docx` و`.pptx` و`.xlsx` و`.html` و`.md` و`.txt` و`.xml`.
 
+## تشغيل الاختبارات
+
+لا تحتاج الاختبارات أي مكتبة خارجية.
+
+```bash
+# مجموعة الاختبارات كاملة
+python3 -m unittest discover -s tests -v
+
+# إثبات أن الاختبارات قادرة على كشف الأعطال: تُعطَّل الأداة عمدًا 13 مرة، ويجب أن تُكشف كل مرة
+python3 tests/mutation_check.py
+```
+
 ## مبادئ المستودع
 - كل مهارة محددة النطاق، وتنص صراحة على ما لا تفعله.
 - لا تعدّل أي أداة الملف الأصلي، وإنما تنتج نسخة منفصلة.
