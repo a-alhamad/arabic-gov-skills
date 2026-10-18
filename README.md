@@ -8,11 +8,12 @@
 |---|---|
 | `arabic-rtl-docs` | ضبط اتجاه RTL في Word وPowerPoint وHTML، وإزالة الرموز غير المرئية وبقايا تنسيق المحادثة وبيانات التعريف الدالة على أداة التوليد، والإبلاغ عن العلامات المرئية والحروف الشبيهة، وعزل المصطلحات الإنجليزية داخل النص العربي |
 | `formal-writing-ar` | أسلوب الكتابة الرسمية والمهنية لكل المستندات: المقترحات والتقارير والخطط وتقارير التقييم والمذكرات ونصوص العروض. يحكم التسلسل والتوثيق ومنع الحشو والاختلاق ودقة السند |
+| `arabic-design-workflow` | ينظّم مهارات التصميم والتخطيط والمراجعة لكل مخرَج بصري: العروض، والملصقات، وصفحات HTML، والواجهات، ولوحات المؤشرات، وتصاميم Canva، تحت ضوابط RTL وعدم وضع نص داخل الصور |
 | `formal-memo-ar` | ما يخص المذكرات الداخلية وحدها: الافتتاح المرجعي، وحسم غرض المذكرة، والألقاب. تعمل مع `formal-writing-ar` |
 
 ## التثبيت
 
-المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي المهارات الثلاث.
+المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي أربع مهارات.
 
 ### في Claude (المحادثة)
 1. **Customize** ثم **Plugins** ثم **Add** ثم **Add marketplace**.
@@ -33,6 +34,7 @@
 .claude-plugin/marketplace.json
 plugins/arabic-gov-skills/
   .claude-plugin/plugin.json
+  skills/arabic-design-workflow/
   skills/arabic-rtl-docs/
   skills/formal-memo-ar/
   skills/formal-writing-ar/
