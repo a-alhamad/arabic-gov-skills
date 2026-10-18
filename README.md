@@ -11,18 +11,39 @@
 
 ## التثبيت
 
+المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي المهارتين.
+
+### في Claude (المحادثة)
+1. **Customize** ثم **Plugins** ثم **Add** ثم **Add marketplace**.
+2. كتابة `a-alhamad/arabic-gov-skills`.
+3. تثبيت الإضافة `arabic-gov-skills` من السوق.
+
+تُحفظ الإضافة في الحساب، وتتاح في المحادثة وفي Claude Code بالحساب نفسه.
+
+### في Claude Code
+
 ```bash
-npx skills add a-alhamad/arabic-gov-skills
+/plugin install arabic-gov-skills --marketplace a-alhamad/arabic-gov-skills
+```
+
+### البنية
+
+```
+.claude-plugin/marketplace.json
+plugins/arabic-gov-skills/
+  .claude-plugin/plugin.json
+  skills/arabic-rtl-docs/
+  skills/formal-memo-ar/
 ```
 
 ## الاستخدام المباشر لأداة الفحص
 
 ```bash
 # فحص فقط
-python3 arabic-rtl-docs/scripts/check_hidden_chars.py report.docx
+python3 plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_chars.py report.docx
 
 # إنتاج نسخة منظفة بجانب الأصل دون المساس به
-python3 arabic-rtl-docs/scripts/check_hidden_chars.py report.docx --fix
+python3 plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_chars.py report.docx --fix
 ```
 
 الصيغ المدعومة: `.docx` و`.pptx` و`.xlsx` و`.html` و`.md` و`.txt` و`.xml`.
