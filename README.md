@@ -58,7 +58,7 @@ python3 plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_ch
 # مجموعة الاختبارات كاملة
 python3 -m unittest discover -s tests -v
 
-# إثبات أن الاختبارات قادرة على كشف الأعطال: تُعطَّل الأداة عمدًا 13 مرة، ويجب أن تُكشف كل مرة
+# إثبات أن الاختبارات قادرة على كشف الأعطال: تُعطَّل الأداة عمدًا 15 مرة، ويجب أن تُكشف كل مرة
 python3 tests/mutation_check.py
 ```
 

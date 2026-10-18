@@ -8,6 +8,8 @@ Three layers are checked:
   3. File metadata / generator signatures (docx/pptx/xlsx properties, HTML
      generator meta tag)
   4. Leftover Markdown from chat output (bold markers, headings, list markers)
+  6. Stock phrases typical of generated Arabic text, listed in
+     ai_phrases_ar.txt next to this script -> reported only, never changed
   5. Lookalike and compatibility forms (Arabic presentation forms, fullwidth
      Latin, Farsi yeh/keheh, tatweel, mixed-script words)
 
@@ -119,6 +121,40 @@ _GREEK_CYR = chr(0x0370) + "-" + chr(0x03FF) + chr(0x0400) + "-" + chr(0x04FF)
 WORD_RE = re.compile("[" + _LATIN + _GREEK_CYR + "]+")
 LATIN_RE = re.compile("[" + _LATIN + "]")
 GREEK_CYR_RE = re.compile("[" + _GREEK_CYR + "]")
+
+# ---------- Layer 6: stock Arabic phrases (report only) ----------
+PHRASES_FILE = Path(__file__).resolve().parent / "ai_phrases_ar.txt"
+_DIACRITICS = set(range(0x064B, 0x0653)) | {0x0670, 0x0640}
+_ALEF_FORMS = {0x0623: 0x0627, 0x0625: 0x0627, 0x0622: 0x0627}
+
+
+def normalize_ar(text):
+    out = []
+    for ch in text:
+        cp = ord(ch)
+        if cp in _DIACRITICS:
+            continue
+        out.append(chr(_ALEF_FORMS.get(cp, cp)))
+    return re.sub(r"\s+", " ", "".join(out))
+
+
+def load_phrases():
+    try:
+        lines = PHRASES_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    return [normalize_ar(s.strip()) for s in lines if s.strip() and not s.lstrip().startswith("#")]
+
+
+def phrase_scan(text, phrases):
+    norm = normalize_ar(text)
+    found = Counter()
+    for p in phrases:
+        n = norm.count(p)
+        if n:
+            found[p] += n
+    return found
+
 
 # ---------- Layer 4: leftover Markdown ----------
 MD_BOLD = re.compile(r"\*\*|__")
@@ -255,7 +291,7 @@ def md_clean_xml(xml):
     return XML_TEXT.sub(lambda m: ">" + MD_BOLD.sub("", m.group(1)) + "<", xml)
 
 
-def report(chars, meta, md, words):
+def report(chars, meta, md, words, phrases=None):
     order = {"remove": 0, "replace": 1, "normalize": 2, "review": 3, "lookalike": 4, "visible": 5}
     labels = {
         "remove": "remove",
@@ -274,6 +310,8 @@ def report(chars, meta, md, words):
         print(f"{n:>6}  MARKDOWN {label} -> removed by --fix")
     for w in sorted(set(words)):
         print(f"  word  {w!r} mixes Latin with Greek/Cyrillic letters -> review manually")
+    for p, n in (phrases or Counter()).items():
+        print(f"{n:>6}  AI-STYLE PHRASE {p!r} -> rewrite manually")
 
 
 BAD_ARCHIVE = "File is not a valid .docx/.pptx/.xlsx archive (corrupt or password-protected)"
@@ -295,6 +333,7 @@ def _main():
     fix = "--fix" in sys.argv[1:]
     ext = path.suffix.lower()
     chars, meta, md, words = Counter(), [], Counter(), []
+    phrases, phrase_list, text_for_phrases = Counter(), load_phrases(), []
     out = path.with_name(f"{path.stem}_clean{path.suffix}")
 
     if ext in {".docx", ".pptx", ".xlsx"}:
@@ -316,6 +355,7 @@ def _main():
             if is_text:
                 md += md_scan_xml(text)
                 words += mixed_script_words(" ".join(XML_TEXT.findall(text)))
+                text_for_phrases.append("".join(XML_TEXT.findall(text)))
             if name in ("docProps/core.xml", "docProps/app.xml"):
                 meta += scan_meta(text)
             if fix:
@@ -335,6 +375,7 @@ def _main():
         text = path.read_text(encoding="utf-8")
         chars = scan(text)
         words = mixed_script_words(text)
+        text_for_phrases.append(text)
         is_plain = ext == ".txt"
         if is_plain:
             md = md_scan_plain(text)
@@ -353,10 +394,11 @@ def _main():
         print(f"Unsupported file type: {ext}")
         return 2
 
-    if not chars and not meta and not md and not words:
+    phrases = phrase_scan(" ".join(text_for_phrases), phrase_list)
+    if not chars and not meta and not md and not words and not phrases:
         print("Clean: no hidden characters, decorative marks, leftover Markdown or generator metadata found.")
     else:
-        report(chars, meta, md, words)
+        report(chars, meta, md, words, phrases)
     if fix:
         print(f"Cleaned copy written: {out}")
         return 0

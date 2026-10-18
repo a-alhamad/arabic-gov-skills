@@ -31,6 +31,8 @@ MUTATIONS = [
     ("non-ASCII character in source", '"""Detect,', '"""' + chr(0x200F) + 'Detect,'),
     ("overwrite the original file", 'out = path.with_name(f"{path.stem}_clean{path.suffix}")', "out = path"),
     ("crash on non-UTF-8 input", "    except UnicodeDecodeError:\n", "    except KeyError:\n"),
+    ("disable stock-phrase layer", "n = norm.count(p)", "n = 0"),
+    ("match phrases without removing diacritics", "norm = normalize_ar(text)", "norm = text"),
 ]
 
 
