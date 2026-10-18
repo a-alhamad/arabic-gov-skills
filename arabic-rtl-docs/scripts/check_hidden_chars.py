@@ -1,114 +1,259 @@
 #!/usr/bin/env python3
-"""Detect (and optionally remove) hidden Unicode characters in Arabic documents.
+"""Detect, and optionally remove, machine-generation traces in Arabic documents.
 
-Supports: .docx, .pptx, .xlsx (XML parts inside the archive), and plain-text
-formats (.html, .htm, .md, .txt, .xml).
+Three layers are checked:
+  1. Invisible characters (zero-width, directional, tag, variation selectors...)
+  2. Visible decorative marks typical of generated text (emoji, arrows, check
+     marks, em dash, ellipsis character)  -> reported only, never auto-removed
+  3. File metadata / generator signatures (docx/pptx/xlsx properties, HTML
+     generator meta tag)
+
+Supports: .docx, .pptx, .xlsx, .html, .htm, .md, .txt, .xml
 
 Usage:
     check_hidden_chars.py FILE          # report only
     check_hidden_chars.py FILE --fix    # write FILE_clean.<ext>, original untouched
+
+Limits: this tool works on characters and metadata. It does not detect
+stylistic patterns in wording; those are handled by human review.
+
+Source note: characters are written as code points (chr(0x....)) so that this
+file itself contains no hidden characters.
 """
+import re
 import sys
 import zipfile
 from collections import Counter
 from pathlib import Path
 
+# ---------- Layer 1: invisible characters ----------
 REMOVE = {
-    "\u200b": "ZERO WIDTH SPACE",
-    "\u200d": "ZERO WIDTH JOINER",
-    "\u200e": "LEFT-TO-RIGHT MARK",
-    "\u200f": "RIGHT-TO-LEFT MARK",
-    "\u202a": "LEFT-TO-RIGHT EMBEDDING",
-    "\u202b": "RIGHT-TO-LEFT EMBEDDING",
-    "\u202c": "POP DIRECTIONAL FORMATTING",
-    "\u202d": "LEFT-TO-RIGHT OVERRIDE",
-    "\u202e": "RIGHT-TO-LEFT OVERRIDE",
-    "\u2066": "LEFT-TO-RIGHT ISOLATE",
-    "\u2067": "RIGHT-TO-LEFT ISOLATE",
-    "\u2068": "FIRST STRONG ISOLATE",
-    "\u2069": "POP DIRECTIONAL ISOLATE",
-    "\ufeff": "BYTE ORDER MARK",
+    0x00AD: "SOFT HYPHEN",
+    0x034F: "COMBINING GRAPHEME JOINER",
+    0x061C: "ARABIC LETTER MARK",
+    0x115F: "HANGUL CHOSEONG FILLER",
+    0x1160: "HANGUL JUNGSEONG FILLER",
+    0x180E: "MONGOLIAN VOWEL SEPARATOR",
+    0x200B: "ZERO WIDTH SPACE",
+    0x200D: "ZERO WIDTH JOINER",
+    0x200E: "LEFT-TO-RIGHT MARK",
+    0x200F: "RIGHT-TO-LEFT MARK",
+    0x202A: "LEFT-TO-RIGHT EMBEDDING",
+    0x202B: "RIGHT-TO-LEFT EMBEDDING",
+    0x202C: "POP DIRECTIONAL FORMATTING",
+    0x202D: "LEFT-TO-RIGHT OVERRIDE",
+    0x202E: "RIGHT-TO-LEFT OVERRIDE",
+    0x2060: "WORD JOINER",
+    0x2061: "FUNCTION APPLICATION",
+    0x2062: "INVISIBLE TIMES",
+    0x2063: "INVISIBLE SEPARATOR",
+    0x2064: "INVISIBLE PLUS",
+    0x2066: "LEFT-TO-RIGHT ISOLATE",
+    0x2067: "RIGHT-TO-LEFT ISOLATE",
+    0x2068: "FIRST STRONG ISOLATE",
+    0x2069: "POP DIRECTIONAL ISOLATE",
+    0x3164: "HANGUL FILLER",
+    0xFEFF: "BYTE ORDER MARK",
+    0xFFA0: "HALFWIDTH HANGUL FILLER",
+    0xFFF9: "INTERLINEAR ANNOTATION ANCHOR",
+    0xFFFA: "INTERLINEAR ANNOTATION SEPARATOR",
+    0xFFFB: "INTERLINEAR ANNOTATION TERMINATOR",
 }
+REMOVE_RANGES = [
+    (0xFE00, 0xFE0F, "VARIATION SELECTOR"),
+    (0xE0000, 0xE007F, "TAG CHARACTER"),
+    (0xE0100, 0xE01EF, "VARIATION SELECTOR SUPPLEMENT"),
+]
 REPLACE = {
-    "\u00a0": (" ", "NO-BREAK SPACE"),
-    "\u201c": ('"', "LEFT DOUBLE QUOTE"),
-    "\u201d": ('"', "RIGHT DOUBLE QUOTE"),
-    "\u2018": ("'", "LEFT SINGLE QUOTE"),
-    "\u2019": ("'", "RIGHT SINGLE QUOTE"),
+    0x00A0: (" ", "NO-BREAK SPACE"),
+    0x2009: (" ", "THIN SPACE"),
+    0x200A: (" ", "HAIR SPACE"),
+    0x202F: (" ", "NARROW NO-BREAK SPACE"),
+    0x201C: ('"', "LEFT DOUBLE QUOTE"),
+    0x201D: ('"', "RIGHT DOUBLE QUOTE"),
+    0x2018: ("'", "LEFT SINGLE QUOTE"),
+    0x2019: ("'", "RIGHT SINGLE QUOTE"),
 }
-REPORT_ONLY = {"\u200c": "ZERO WIDTH NON-JOINER (review manually)"}
+REPORT_INVISIBLE = {0x200C: "ZERO WIDTH NON-JOINER (review manually)"}
 
-ZIP_EXT = {".docx", ".pptx", ".xlsx"}
-TEXT_EXT = {".html", ".htm", ".md", ".txt", ".xml"}
+# ---------- Layer 2: visible decorative marks (report only) ----------
+VISIBLE = {
+    0x2014: "EM DASH",
+    0x2015: "HORIZONTAL BAR",
+    0x2026: "ELLIPSIS CHARACTER",
+    0x2705: "CHECK MARK BUTTON",
+    0x2713: "CHECK MARK",
+    0x2714: "HEAVY CHECK MARK",
+    0x2716: "HEAVY MULTIPLICATION X",
+    0x2717: "BALLOT X",
+    0x2718: "HEAVY BALLOT X",
+    0x274C: "CROSS MARK",
+    0x2605: "BLACK STAR",
+}
+VISIBLE_RANGES = [
+    (0x2190, 0x21FF, "ARROW"),
+    (0x27F0, 0x27FF, "ARROW"),
+    (0x2B00, 0x2BFF, "ARROW OR SYMBOL"),
+    (0x2600, 0x26FF, "MISC SYMBOL"),
+    (0x2700, 0x27BF, "DINGBAT"),
+    (0x1F300, 0x1FAFF, "EMOJI"),
+]
+# Only text-bearing parts are scanned for visible marks; numbering/styles
+# parts legitimately hold bullet glyphs.
+TEXT_PARTS = re.compile(
+    r"^(word/(document|header\d*|footer\d*|footnotes|endnotes|comments)\.xml"
+    r"|ppt/(slides/slide|notesSlides/notesSlide)\d+\.xml"
+    r"|xl/sharedStrings\.xml)$"
+)
+
+# ---------- Layer 3: metadata / generator signatures ----------
+GENERATOR_HINTS = re.compile(
+    r"python-docx|python-pptx|openpyxl|docx\.js|un-named|claude|anthropic|"
+    r"openai|chatgpt|gpt|gemini|copilot|generated by|ai[- ]generated",
+    re.I,
+)
+META_FIELDS = re.compile(
+    r"<(dc:creator|cp:lastModifiedBy|dc:description|cp:keywords|dc:subject|"
+    r"Application|Company|Manager)(\s[^>]*)?>([^<]*)</\1>"
+)
+HTML_GENERATOR = re.compile(r"<meta[^>]+name=[\"']generator[\"'][^>]*>\s*", re.I)
 
 
-def scan(text: str) -> Counter:
+def _in_ranges(cp, ranges):
+    for lo, hi, name in ranges:
+        if lo <= cp <= hi:
+            return name
+    return None
+
+
+def classify(ch):
+    cp = ord(ch)
+    if cp in REMOVE:
+        return "remove", REMOVE[cp]
+    name = _in_ranges(cp, REMOVE_RANGES)
+    if name:
+        return "remove", name
+    if cp in REPLACE:
+        return "replace", REPLACE[cp][1]
+    if cp in REPORT_INVISIBLE:
+        return "review", REPORT_INVISIBLE[cp]
+    if cp in VISIBLE:
+        return "visible", VISIBLE[cp]
+    name = _in_ranges(cp, VISIBLE_RANGES)
+    if name:
+        return "visible", name
+    return None
+
+
+def scan(text, visible=True):
     found = Counter()
     for ch in text:
-        if ch in REMOVE or ch in REPLACE or ch in REPORT_ONLY:
-            found[ch] += 1
+        c = classify(ch)
+        if c and (visible or c[0] != "visible"):
+            found[(c[0], ord(ch), c[1])] += 1
     return found
 
 
-def clean(text: str) -> str:
-    for ch in REMOVE:
-        text = text.replace(ch, "")
-    for ch, (rep, _) in REPLACE.items():
-        text = text.replace(ch, rep)
-    return text
+def clean(text):
+    out = []
+    for ch in text:
+        c = classify(ch)
+        if c is None or c[0] in ("review", "visible"):
+            out.append(ch)
+        elif c[0] == "replace":
+            out.append(REPLACE[ord(ch)][0])
+    return "".join(out)
 
 
-def label(ch: str) -> str:
-    if ch in REMOVE:
-        return f"U+{ord(ch):04X} {REMOVE[ch]} -> remove"
-    if ch in REPLACE:
-        return f"U+{ord(ch):04X} {REPLACE[ch][1]} -> replace"
-    return f"U+{ord(ch):04X} {REPORT_ONLY[ch]}"
+def scan_meta(xml):
+    hits = []
+    for m in META_FIELDS.finditer(xml):
+        tag, value = m.group(1), m.group(3).strip()
+        if value:
+            flag = "generator" if GENERATOR_HINTS.search(value) else "info"
+            hits.append((flag, tag, value))
+    return hits
 
 
-def main() -> int:
+def clean_meta(xml):
+    def sub(m):
+        if GENERATOR_HINTS.search(m.group(3)):
+            return f"<{m.group(1)}{m.group(2) or ''}></{m.group(1)}>"
+        return m.group(0)
+    return META_FIELDS.sub(sub, xml)
+
+
+def report(chars, meta):
+    order = {"remove": 0, "replace": 1, "review": 2, "visible": 3}
+    labels = {
+        "remove": "remove",
+        "replace": "replace",
+        "review": "review manually",
+        "visible": "visible mark, review manually",
+    }
+    for (kind, cp, name), n in sorted(chars.items(), key=lambda x: (order[x[0][0]], x[0][1])):
+        print(f"{n:>6}  U+{cp:04X} {name} -> {labels[kind]}")
+    for flag, tag, value in meta:
+        mark = "GENERATOR SIGNATURE -> cleared by --fix" if flag == "generator" else "metadata, review"
+        print(f"  meta  {tag} = {value!r} -> {mark}")
+
+
+def main():
     if len(sys.argv) < 2:
         print(__doc__)
         return 2
     path = Path(sys.argv[1])
     fix = "--fix" in sys.argv[2:]
     ext = path.suffix.lower()
-    total = Counter()
+    chars, meta = Counter(), []
+    out = path.with_name(f"{path.stem}_clean{path.suffix}")
 
-    if ext in ZIP_EXT:
+    if ext in {".docx", ".pptx", ".xlsx"}:
         with zipfile.ZipFile(path) as zin:
-            parts = {n: zin.read(n) for n in zin.namelist()}
-        out_parts = {}
-        for name, data in parts.items():
-            if name.endswith((".xml", ".rels")):
-                text = data.decode("utf-8")
-                total += scan(text)
-                out_parts[name] = clean(text).encode("utf-8") if fix else data
+            infos = zin.infolist()
+            data = {i.filename: zin.read(i.filename) for i in infos}
+        new = {}
+        for name, raw in data.items():
+            if not name.endswith((".xml", ".rels")):
+                new[name] = raw
+                continue
+            text = raw.decode("utf-8")
+            chars += scan(text, visible=bool(TEXT_PARTS.match(name)))
+            if name in ("docProps/core.xml", "docProps/app.xml"):
+                meta += scan_meta(text)
+            if fix:
+                text = clean(text)
+                if name in ("docProps/core.xml", "docProps/app.xml"):
+                    text = clean_meta(text)
+                new[name] = text.encode("utf-8")
             else:
-                out_parts[name] = data
+                new[name] = raw
         if fix:
-            out = path.with_name(f"{path.stem}_clean{path.suffix}")
-            with zipfile.ZipFile(path) as zin, zipfile.ZipFile(out, "w") as zout:
-                for info in zin.infolist():
-                    zout.writestr(info, out_parts[info.filename], zipfile.ZIP_DEFLATED)
-    elif ext in TEXT_EXT:
+            with zipfile.ZipFile(out, "w") as zout:
+                for i in infos:
+                    zout.writestr(i, new[i.filename], zipfile.ZIP_DEFLATED)
+    elif ext in {".html", ".htm", ".md", ".txt", ".xml"}:
         text = path.read_text(encoding="utf-8")
-        total = scan(text)
+        chars = scan(text)
+        for m in HTML_GENERATOR.finditer(text):
+            meta.append(("generator", "meta generator", m.group(0).strip()))
         if fix:
-            out = path.with_name(f"{path.stem}_clean{path.suffix}")
-            out.write_text(clean(text), encoding="utf-8")
+            out.write_text(HTML_GENERATOR.sub("", clean(text)), encoding="utf-8")
     else:
         print(f"Unsupported file type: {ext}")
         return 2
 
-    if not total:
-        print("Clean: no hidden or non-standard characters found.")
+    if not chars and not meta:
+        print("Clean: no hidden characters, decorative marks or generator metadata found.")
     else:
-        for ch, n in sorted(total.items()):
-            print(f"{n:>6}  {label(ch)}")
+        report(chars, meta)
     if fix:
         print(f"Cleaned copy written: {out}")
-    return 1 if total and not fix else 0
+        return 0
+    blocking = any(k[0] in ("remove", "replace") for k in chars) or any(
+        f == "generator" for f, _, _ in meta
+    )
+    return 1 if blocking else 0
 
 
 if __name__ == "__main__":
