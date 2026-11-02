@@ -4,6 +4,8 @@
 
 ## المهارات المتاحة
 
+مهارات الإضافة `arabic-gov-skills`:
+
 | المهارة | الغرض |
 |---|---|
 | `arabic-rtl-docs` | ضبط اتجاه RTL في Word وPowerPoint وHTML، وإزالة الرموز غير المرئية وبقايا تنسيق المحادثة وبيانات التعريف الدالة على أداة التوليد، والإبلاغ عن العلامات المرئية والحروف الشبيهة، وعزل المصطلحات الإنجليزية داخل النص العربي |
@@ -12,34 +14,59 @@
 | `document-pattern-analysis` | تفكيك مستند أو عرض نموذجي إلى بنيته ووظيفة أقسامه ومسار حجته وأسلوبه، واستخلاص قالب وقائمة مراجعة لإعادة الاستخدام دون نسخ النص |
 | `formal-memo-ar` | ما يخص المذكرات الداخلية وحدها: الافتتاح المرجعي، وحسم غرض المذكرة، والألقاب. تعمل مع `formal-writing-ar` |
 
+## الإضافات الأخرى
+
+| الإضافة | المهارة | الغرض |
+|---|---|---|
+| `gov-templates` | `presentation-templates` | قوالب PowerPoint جاهزة لأدلة الموظفين والتهيئة والامتثال وتقييم التدريب ومخططات القرار |
+| `free-llm-gateway` | `free-llm-gateway` | بوابة محلية متوافقة مع OpenAI على `http://127.0.0.1:4000/v1` تجمع الطبقات المجانية لمزودي Gemini وGroq وCerebras وMistral وOpenRouter، مع تحويل تلقائي عند تجاوز الحد |
+
 ## التثبيت
 
-المستودع سوق إضافات (Plugin Marketplace) يضم إضافة واحدة باسم `arabic-gov-skills` تحتوي خمس مهارات.
+المستودع سوق إضافات (Plugin Marketplace) يضم ثلاث إضافات مستقلة. تُثبَّت كل إضافة مرة واحدة على مستوى الحساب، فتتاح في كل المشاريع.
 
 ### في Claude (المحادثة)
 1. **Customize** ثم **Plugins** ثم **Add** ثم **Add marketplace**.
 2. كتابة `a-alhamad/arabic-gov-skills`.
-3. تثبيت الإضافة `arabic-gov-skills` من السوق.
-
-تُحفظ الإضافة في الحساب، وتتاح في المحادثة وفي Claude Code بالحساب نفسه.
+3. تثبيت الإضافات المطلوبة من السوق.
 
 ### في Claude Code
 
 ```bash
-/plugin install arabic-gov-skills --marketplace a-alhamad/arabic-gov-skills
+/plugin marketplace add a-alhamad/arabic-gov-skills
 ```
+
+```bash
+/plugin install arabic-gov-skills@a-alhamad-skills
+```
+
+```bash
+/plugin install gov-templates@a-alhamad-skills
+```
+
+```bash
+/plugin install free-llm-gateway@a-alhamad-skills
+```
+
+### في بيئات Claude Code السحابية
+في إعدادات البيئة:
+1. **Setup script**: إضافة السطر التالي لتثبيت مكونات البوابة المجانية:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/a-alhamad/arabic-gov-skills/main/setup/cloud-setup.sh | bash
+   ```
+2. **Network secrets**: إضافة مفتاح مزود مجاني واحد على الأقل، مثل `GEMINI_API_KEY`.
+3. **Network access**: إضافة نطاقات المزودين إلى Allowed domains. القائمة في مهارة `free-llm-gateway`.
 
 ### البنية
 
 ```
 .claude-plugin/marketplace.json
-plugins/arabic-gov-skills/
-  .claude-plugin/plugin.json
-  skills/arabic-design-workflow/
-  skills/arabic-rtl-docs/
-  skills/document-pattern-analysis/
-  skills/formal-memo-ar/
-  skills/formal-writing-ar/
+plugins/
+  arabic-gov-skills/      مهارات الكتابة والتنظيف والتصميم
+  gov-templates/          قوالب العروض في skills/presentation-templates/assets/
+  free-llm-gateway/       البوابة المجانية: skills/free-llm-gateway/scripts/gateway.py
+setup/cloud-setup.sh      سكربت إعداد البيئة السحابية، ولا يحتوي أي مفتاح
+tests/
 ```
 
 ## الاستخدام المباشر لأداة الفحص
@@ -56,7 +83,7 @@ python3 plugins/arabic-gov-skills/skills/arabic-rtl-docs/scripts/check_hidden_ch
 
 ## تشغيل الاختبارات
 
-لا تحتاج الاختبارات أي مكتبة خارجية.
+لا تحتاج الاختبارات أي مكتبة خارجية، ولا تحتاج LiteLLM.
 
 ```bash
 # مجموعة الاختبارات كاملة
@@ -70,7 +97,8 @@ python3 tests/mutation_check.py
 قائمة الحد الأدنى لجودة التصميم مقتبسة بتصرف من مستودع impeccable بترخيص Apache 2.0. التفاصيل ونص الترخيص في `THIRD_PARTY_NOTICES.md`.
 
 ## مبادئ المستودع
-- عند كل تعديل على المهارات يُرفع رقم الإصدار في `plugins/arabic-gov-skills/.claude-plugin/plugin.json`، وإلا لا يصل التعديل إلى الإضافة المثبتة.
+- عند كل تعديل على إضافة يُرفع رقم الإصدار في ملف `.claude-plugin/plugin.json` الخاص بها، وإلا لا يصل التعديل إلى الإضافة المثبتة.
+- لا يُحفظ أي مفتاح أو بيانات مؤسسية في المستودع، فهو عام. المفاتيح تُقرأ من متغيرات البيئة فقط.
 - كل مهارة محددة النطاق، وتنص صراحة على ما لا تفعله.
 - لا تعدّل أي أداة الملف الأصلي، وإنما تنتج نسخة منفصلة.
 - تُختبر الأدوات قبل إضافتها.

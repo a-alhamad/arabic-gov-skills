@@ -1,6 +1,6 @@
 {
   "name": "a-alhamad-skills",
-  "description": "Skills for formal Arabic writing, document hygiene (strict RTL, hidden-character and AI-trace cleanup) and design workflow.",
+  "description": "Skills for formal Arabic writing, document hygiene (strict RTL, hidden-character and AI-trace cleanup) and design workflow, plus presentation templates and a free LLM gateway.",
   "owner": {
     "name": "Alaa Al-Hamad"
   },
@@ -9,6 +9,16 @@
       "name": "arabic-gov-skills",
       "source": "./plugins/arabic-gov-skills",
       "description": "Arabic formal writing, document hygiene and design workflow skills."
+    },
+    {
+      "name": "gov-templates",
+      "source": "./plugins/gov-templates",
+      "description": "Ready PowerPoint templates for HR, onboarding, compliance and training decks."
+    },
+    {
+      "name": "free-llm-gateway",
+      "source": "./plugins/free-llm-gateway",
+      "description": "Local OpenAI-compatible gateway over free-tier LLM providers with automatic fallback."
     }
   ]
 }
