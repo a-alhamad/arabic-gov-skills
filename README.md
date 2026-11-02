@@ -57,6 +57,16 @@
 2. **Network secrets**: إضافة مفتاح مزود مجاني واحد على الأقل، مثل `GEMINI_API_KEY`.
 3. **Network access**: إضافة نطاقات المزودين إلى Allowed domains. القائمة في مهارة `free-llm-gateway`.
 
+بعدها تتوفر في كل جلسة جديدة الأوامر التالية، دون الحاجة لربط المستودع أو تثبيت الإضافة:
+
+```bash
+free-gw start
+```
+
+```bash
+free-gw check --model formal
+```
+
 ### البنية
 
 ```
@@ -65,7 +75,7 @@ plugins/
   arabic-gov-skills/      مهارات الكتابة والتنظيف والتصميم
   gov-templates/          قوالب العروض في skills/presentation-templates/assets/
   free-llm-gateway/       البوابة المجانية: skills/free-llm-gateway/scripts/gateway.py
-setup/cloud-setup.sh      سكربت إعداد البيئة السحابية، ولا يحتوي أي مفتاح
+setup/cloud-setup.sh      سكربت إعداد البيئة السحابية: ينزّل الأدوات ويثبّت الأمر free-gw، ولا يحتوي أي مفتاح
 tests/
 ```
 
