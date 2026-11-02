@@ -51,8 +51,15 @@ class GatewayConfigTests(unittest.TestCase):
     def test_free_alias_uses_first_provider_and_falls_back_to_rest_in_order(self):
         cfg = self.config(GEMINI_API_KEY="a", CEREBRAS_API_KEY="b", OPENROUTER_API_KEY="c")
         free = [m for m in cfg["model_list"] if m["model_name"] == "free"][0]
-        self.assertTrue(free["litellm_params"]["model"].startswith("gemini/"))
-        self.assertEqual(cfg["router_settings"]["fallbacks"], [{"free": ["cerebras", "openrouter"]}])
+        self.assertEqual(free["litellm_params"]["model"], "gemini/gemini-2.5-pro")
+        self.assertEqual(cfg["router_settings"]["fallbacks"],
+                         [{"free": ["gemini", "cerebras", "openrouter"]}])
+
+    def test_one_gemini_key_gives_pro_then_flash(self):
+        cfg = self.config(GEMINI_API_KEY="a")
+        names = [m["model_name"] for m in cfg["model_list"]]
+        self.assertEqual(names, ["gemini-pro", "gemini", "free"])
+        self.assertEqual(cfg["router_settings"]["fallbacks"], [{"free": ["gemini"]}])
 
     def test_keys_are_referenced_never_embedded(self):
         cfg = self.config(GEMINI_API_KEY="secret-value-123")
@@ -61,8 +68,11 @@ class GatewayConfigTests(unittest.TestCase):
         self.assertIn("os.environ/GEMINI_API_KEY", text)
 
     def test_model_override_from_environment(self):
-        cfg = self.config(GEMINI_API_KEY="a", FREE_GW_GEMINI_MODEL="gemini/other")
-        self.assertEqual(cfg["model_list"][0]["litellm_params"]["model"], "gemini/other")
+        cfg = self.config(GEMINI_API_KEY="a", FREE_GW_GEMINI_MODEL="gemini/other",
+                          FREE_GW_GEMINI_PRO_MODEL="gemini/pro-other")
+        by_name = {m["model_name"]: m["litellm_params"]["model"] for m in cfg["model_list"]}
+        self.assertEqual(by_name["gemini"], "gemini/other")
+        self.assertEqual(by_name["gemini-pro"], "gemini/pro-other")
 
     def test_cli_providers_runs_without_keys(self):
         out = subprocess.run([sys.executable, "-I", str(GATEWAY), "providers"],
@@ -90,7 +100,7 @@ class GatewayConfigTests(unittest.TestCase):
         self.assertEqual(cfg["model_list"][0]["litellm_params"]["model"], "zai/glm-4.7-flash")
 
     def test_api_base_override(self):
-        cfg = self.config(GEMINI_API_KEY="a", FREE_GW_GEMINI_API_BASE="http://x/v1")
+        cfg = self.config(GROQ_API_KEY="a", FREE_GW_GROQ_API_BASE="http://x/v1")
         for m in cfg["model_list"]:
             self.assertEqual(m["litellm_params"]["api_base"], "http://x/v1")
 

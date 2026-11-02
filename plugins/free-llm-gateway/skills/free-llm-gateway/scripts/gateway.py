@@ -29,9 +29,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Order matters: first available provider is the primary for "free".
-# Gemini first because it handles Arabic best among the free tiers.
+# Order matters: strongest first. "free" starts at the first available entry and
+# falls back down the list as quotas run out. Gemini Pro leads (strongest, best
+# Arabic, smallest free quota), then Gemini Flash on the same key, then the rest.
 PROVIDERS = [
+    ("gemini-pro", "GEMINI_API_KEY", "gemini/gemini-2.5-pro"),
     ("gemini", "GEMINI_API_KEY", "gemini/gemini-2.5-flash"),
     ("groq", "GROQ_API_KEY", "groq/openai/gpt-oss-120b"),
     ("cerebras", "CEREBRAS_API_KEY", "cerebras/gpt-oss-120b"),
@@ -54,8 +56,12 @@ PORT = int(os.environ.get("FREE_GW_PORT", "4000"))
 MASTER_KEY = os.environ.get("FREE_GW_MASTER_KEY", "sk-local-free-gateway")
 
 
+def env_name(name):
+    return name.upper().replace("-", "_")
+
+
 def model_for(name, default):
-    return os.environ.get(f"FREE_GW_{name.upper()}_MODEL", default)
+    return os.environ.get(f"FREE_GW_{env_name(name)}_MODEL", default)
 
 
 def available(providers=PROVIDERS):
@@ -84,7 +90,7 @@ def build_config(env_providers, paid=(), style=False):
     model_list = []
     for name, key, model in list(env_providers) + list(paid):
         params = {"model": model, "api_key": f"os.environ/{key}"}
-        base = os.environ.get(f"FREE_GW_{name.upper()}_API_BASE")
+        base = os.environ.get(f"FREE_GW_{env_name(name)}_API_BASE")
         if base:
             params["api_base"] = base
         model_list.append({"model_name": name, "litellm_params": params})

@@ -21,14 +21,16 @@ description: Use when a script, tool or app needs an LLM API without paid credit
 
 | الترتيب | المزود | متغير المفتاح | النموذج الافتراضي | مصدر المفتاح المجاني |
 |---|---|---|---|---|
-| 1 | Gemini | `GEMINI_API_KEY` | `gemini/gemini-2.5-flash` | aistudio.google.com |
-| 2 | Groq | `GROQ_API_KEY` | `groq/openai/gpt-oss-120b` | console.groq.com |
-| 3 | Cerebras | `CEREBRAS_API_KEY` | `cerebras/gpt-oss-120b` | cloud.cerebras.ai |
-| 4 | Mistral | `MISTRAL_API_KEY` | `mistral/mistral-small-latest` | console.mistral.ai |
-| 5 | Z.ai | `ZAI_API_KEY` | `zai/glm-4.7-flash` | z.ai |
-| 6 | OpenRouter | `OPENROUTER_API_KEY` | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | openrouter.ai |
+| 1 | Gemini Pro | `GEMINI_API_KEY` | `gemini/gemini-2.5-pro` | aistudio.google.com |
+| 2 | Gemini Flash | `GEMINI_API_KEY` (المفتاح نفسه) | `gemini/gemini-2.5-flash` | aistudio.google.com |
+| 3 | Groq | `GROQ_API_KEY` | `groq/openai/gpt-oss-120b` | console.groq.com |
+| 4 | Cerebras | `CEREBRAS_API_KEY` | `cerebras/gpt-oss-120b` | cloud.cerebras.ai |
+| 5 | Mistral | `MISTRAL_API_KEY` | `mistral/mistral-small-latest` | console.mistral.ai |
+| 6 | Z.ai | `ZAI_API_KEY` | `zai/glm-4.7-flash` | z.ai |
+| 7 | OpenRouter | `OPENROUTER_API_KEY` | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | openrouter.ai |
 
-- Gemini أولًا لأنه الأفضل في العربية بين الطبقات المجانية.
+- الترتيب من الأقوى إلى الأسرع: Gemini Pro أولًا، وهو الأقوى والأفضل في العربية لكن حصته المجانية صغيرة. عند نفادها تنتقل البوابة تلقائيًا إلى Gemini Flash بالمفتاح نفسه، ثم إلى بقية المزودين.
+- كل مفتاح يُضاف يدخل السلسلة تلقائيًا دون أي ضبط.
 - يُستبعد تلقائيًا كل مزود لا يوجد مفتاحه. مفتاح مجاني واحد يكفي للتشغيل.
 - لتوجيه مزود إلى عنوان آخر: `FREE_GW_<PROVIDER>_API_BASE`.
 
@@ -65,7 +67,7 @@ description: Use when a script, tool or app needs an LLM API without paid credit
 ```
 Base URL: http://127.0.0.1:4000/v1
 API key:  sk-local-free-gateway   (أو قيمة FREE_GW_MASTER_KEY)
-Model:    free | formal | gemini | groq | ... | kimi | glm
+Model:    free | formal | gemini-pro | gemini | groq | ... | kimi | glm
 ```
 
 ```python
