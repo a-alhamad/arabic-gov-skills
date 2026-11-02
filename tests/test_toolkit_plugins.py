@@ -15,7 +15,8 @@ from helpers import REPO
 GATEWAY = REPO / "plugins/free-llm-gateway/skills/free-llm-gateway/scripts/gateway.py"
 TEMPLATES = REPO / "plugins/gov-templates/skills/presentation-templates"
 KEYS = ["GEMINI_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY", "MISTRAL_API_KEY",
-        "OPENROUTER_API_KEY"]
+        "ZAI_API_KEY", "OPENROUTER_API_KEY", "MOONSHOT_API_KEY"]
+STYLE_HOOK = GATEWAY.parent / "style_hook.py"
 
 
 def load_gateway():
@@ -32,10 +33,10 @@ def clean_env(**keys):
 
 
 class GatewayConfigTests(unittest.TestCase):
-    def config(self, **keys):
+    def config(self, style=False, **keys):
         with mock.patch.dict(os.environ, clean_env(**keys), clear=True):
             gw = load_gateway()
-            return gw.build_config(gw.available())
+            return gw.build_config(gw.available(), gw.available(gw.PAID_PROVIDERS), style=style)
 
     def test_no_key_refuses_with_list_of_variables(self):
         with self.assertRaises(SystemExit) as cm:
@@ -67,7 +68,81 @@ class GatewayConfigTests(unittest.TestCase):
         out = subprocess.run([sys.executable, "-I", str(GATEWAY), "providers"],
                              capture_output=True, text=True, env=clean_env())
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(out.stdout.count("missing"), len(KEYS))
+        self.assertIn("free  gemini", out.stdout)
+        self.assertIn("paid  kimi", out.stdout)
+
+    def test_paid_models_are_callable_by_name_but_never_in_fallback(self):
+        cfg = self.config(GEMINI_API_KEY="a", MOONSHOT_API_KEY="b", ZAI_API_KEY="c")
+        names = [m["model_name"] for m in cfg["model_list"]]
+        self.assertIn("kimi", names)
+        self.assertIn("glm", names)
+        chain = cfg["router_settings"]["fallbacks"][0]["free"]
+        self.assertNotIn("kimi", chain)
+        self.assertNotIn("glm", chain)
+        self.assertIn("zai", chain)
+
+    def test_paid_key_alone_does_not_start_gateway(self):
+        with self.assertRaises(SystemExit):
+            self.config(MOONSHOT_API_KEY="b")
+
+    def test_zai_free_tier_uses_free_flash_model(self):
+        cfg = self.config(ZAI_API_KEY="c")
+        self.assertEqual(cfg["model_list"][0]["litellm_params"]["model"], "zai/glm-4.7-flash")
+
+    def test_api_base_override(self):
+        cfg = self.config(GEMINI_API_KEY="a", FREE_GW_GEMINI_API_BASE="http://x/v1")
+        for m in cfg["model_list"]:
+            self.assertEqual(m["litellm_params"]["api_base"], "http://x/v1")
+
+    def test_style_hook_registered_only_when_style_found(self):
+        self.assertNotIn("callbacks", self.config(GEMINI_API_KEY="a")["litellm_settings"])
+        cfg = self.config(style=True, GEMINI_API_KEY="a")
+        self.assertEqual(cfg["litellm_settings"]["callbacks"], "style_hook.proxy_handler_instance")
+
+    def test_style_file_found_in_repo_layout(self):
+        with mock.patch.dict(os.environ, clean_env(), clear=True):
+            found = load_gateway().find_style_file()
+        self.assertEqual(found, REPO / "plugins/arabic-gov-skills/skills/formal-writing-ar/SKILL.md")
+
+
+def load_style_hook():
+    spec = importlib.util.spec_from_file_location("style_hook", STYLE_HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    with mock.patch.dict(os.environ, clean_env(), clear=True):
+        spec.loader.exec_module(mod)
+    return mod
+
+
+class StyleHookTests(unittest.TestCase):
+    def setUp(self):
+        self.hook = load_style_hook()
+
+    def test_formal_request_gets_style_and_goes_to_free_chain(self):
+        data = {"model": "formal", "messages": [{"role": "user", "content": "q"}]}
+        self.assertTrue(self.hook.apply_style(data, "STYLE"))
+        self.assertEqual(data["model"], "free")
+        self.assertEqual(data["messages"][0], {"role": "system", "content": "STYLE"})
+        self.assertEqual(data["messages"][1]["content"], "q")
+
+    def test_existing_system_message_is_kept_after_style(self):
+        data = {"model": "formal", "messages": [{"role": "system", "content": "mine"},
+                                                {"role": "user", "content": "q"}]}
+        self.hook.apply_style(data, "STYLE")
+        self.assertEqual(len(data["messages"]), 2)
+        self.assertTrue(data["messages"][0]["content"].startswith("STYLE"))
+        self.assertTrue(data["messages"][0]["content"].endswith("mine"))
+
+    def test_other_models_are_untouched(self):
+        data = {"model": "free", "messages": [{"role": "user", "content": "q"}]}
+        self.assertFalse(self.hook.apply_style(data, "STYLE"))
+        self.assertEqual(data, {"model": "free", "messages": [{"role": "user", "content": "q"}]})
+
+    def test_frontmatter_is_stripped_from_real_style_file(self):
+        style = self.hook.load_style(
+            REPO / "plugins/arabic-gov-skills/skills/formal-writing-ar/SKILL.md")
+        self.assertFalse(style.startswith("---"))
+        self.assertNotIn("description:", style.split("\n")[0])
+        self.assertIn("منع الاختلاق", style)
 
 
 class TemplateTests(unittest.TestCase):

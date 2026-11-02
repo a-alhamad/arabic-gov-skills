@@ -1,6 +1,6 @@
 ---
 name: free-llm-gateway
-description: Use when a script, tool or app needs an LLM API without paid credits - starts a local OpenAI-compatible gateway (LiteLLM) at http://127.0.0.1:4000/v1 over free-tier providers (Gemini, Groq, Cerebras, Mistral, OpenRouter) with automatic fallback on rate limits. Also use when the user mentions running out of API credit, rate limits, OmniRoute, or wants a free model endpoint.
+description: Use when a script, tool or app needs an LLM API without paid credits - starts a local OpenAI-compatible gateway (LiteLLM) at http://127.0.0.1:4000/v1 over free-tier providers (Gemini, Groq, Cerebras, Mistral, Z.ai GLM Flash, OpenRouter) with automatic fallback on rate limits; model "formal" injects the formal-writing-ar style automatically; paid Kimi and GLM-5.3 are opt-in by name only. Also use when the user mentions running out of API credit, rate limits, OmniRoute, or wants a free model endpoint.
 ---
 
 # بوابة النماذج المجانية
@@ -12,6 +12,10 @@ description: Use when a script, tool or app needs an LLM API without paid credit
 - لا تستبدل نموذج Claude في Claude Code. الجلسة تعمل باشتراك المستخدم، والبوابة تخدم السكربتات والأدوات التي يكتبها.
 - لا تخزن أي مفتاح. تقرأ المفاتيح من متغيرات البيئة فقط.
 - لا تستقبل اتصالات من خارج الجهاز. تعمل على `127.0.0.1` فقط.
+- لا تحوّل أي طلب تلقائيًا إلى مزود مدفوع.
+
+## سرية البيانات
+الطبقات المجانية قد تستخدم المدخلات في تحسين النماذج، وبعض المزودين (Z.ai وMoonshot) يعالجون البيانات خارج نطاقك القانوني. **لا تُرسل عبر البوابة أي محتوى سري أو بيانات جهات خاضعة للرقابة.** البوابة للمحتوى العام فقط: المعايير المنشورة والمراجع والمسودات الخالية من البيانات المؤسسية.
 
 ## المزودون وترتيب التحويل
 
@@ -21,10 +25,29 @@ description: Use when a script, tool or app needs an LLM API without paid credit
 | 2 | Groq | `GROQ_API_KEY` | `groq/openai/gpt-oss-120b` | console.groq.com |
 | 3 | Cerebras | `CEREBRAS_API_KEY` | `cerebras/gpt-oss-120b` | cloud.cerebras.ai |
 | 4 | Mistral | `MISTRAL_API_KEY` | `mistral/mistral-small-latest` | console.mistral.ai |
-| 5 | OpenRouter | `OPENROUTER_API_KEY` | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | openrouter.ai |
+| 5 | Z.ai | `ZAI_API_KEY` | `zai/glm-4.7-flash` | z.ai |
+| 6 | OpenRouter | `OPENROUTER_API_KEY` | `openrouter/meta-llama/llama-3.3-70b-instruct:free` | openrouter.ai |
 
 - Gemini أولًا لأنه الأفضل في العربية بين الطبقات المجانية.
-- يُستبعد تلقائيًا كل مزود لا يوجد مفتاحه. مفتاح واحد يكفي للتشغيل.
+- يُستبعد تلقائيًا كل مزود لا يوجد مفتاحه. مفتاح مجاني واحد يكفي للتشغيل.
+- لتوجيه مزود إلى عنوان آخر: `FREE_GW_<PROVIDER>_API_BASE`.
+
+## مزودون مدفوعون (اختياري)
+منخفضو التكلفة، ويُستدعون **باسمهم فقط**، ولا يدخلون سلسلة التحويل التلقائي إطلاقًا.
+
+| الاسم | متغير المفتاح | النموذج | التكلفة التقريبية لكل مليون رمز |
+|---|---|---|---|
+| `kimi` | `MOONSHOT_API_KEY` | `moonshot/kimi-k3.1-pro` | 2 دولار إدخال، 10 دولارات إخراج |
+| `glm` | `ZAI_API_KEY` | `zai/glm-5.3` | 1.4 دولار إدخال، 4.4 دولار إخراج |
+
+الأسعار من جدول LiteLLM، وتُراجع في لوحة المزود قبل الاستخدام. يُضبط سقف إنفاق في حساب المزود.
+لا تُستخدم «جسور» تحاكي جلسات الويب المجانية لهذه المنصات، لمخالفتها شروط الاستخدام.
+
+## الأسلوب الرسمي التلقائي
+النموذج `formal` يضيف نص مهارة `formal-writing-ar` تعليماتٍ ثابتة (System Prompt) لكل طلب، ثم يمر بسلسلة `free` نفسها.
+- يُعثر على المهارة تلقائيًا في المستودع أو في الإضافات المثبتة، أو من المسار في `FREE_GW_STYLE_FILE`.
+- إن كانت للطلب تعليمات ثابتة أصلًا، يُضاف الأسلوب قبلها دون حذفها.
+- يستهلك نحو 3 آلاف رمز إضافي لكل طلب من الحصة المجانية.
 - لتغيير نموذج مزود: `FREE_GW_<PROVIDER>_MODEL`، مثل `FREE_GW_GEMINI_MODEL=gemini/gemini-2.5-flash-lite`.
 
 ## الخطوات
@@ -42,7 +65,7 @@ description: Use when a script, tool or app needs an LLM API without paid credit
 ```
 Base URL: http://127.0.0.1:4000/v1
 API key:  sk-local-free-gateway   (أو قيمة FREE_GW_MASTER_KEY)
-Model:    free                    (أو اسم مزود محدد: gemini, groq, ...)
+Model:    free | formal | gemini | groq | ... | kimi | glm
 ```
 
 ```python
@@ -61,4 +84,4 @@ client.chat.completions.create(model="free", messages=[{"role": "user", "content
 | `model not found` | المزود غيّر اسم النموذج | ضبط `FREE_GW_<PROVIDER>_MODEL` بالاسم الحالي |
 
 ## نطاقات الشبكة المطلوبة في البيئة السحابية
-`generativelanguage.googleapis.com` و`api.groq.com` و`api.cerebras.ai` و`api.mistral.ai` و`openrouter.ai`
+`generativelanguage.googleapis.com` و`api.groq.com` و`api.cerebras.ai` و`api.mistral.ai` و`api.z.ai` و`openrouter.ai`، وللمدفوع: `api.moonshot.ai`
