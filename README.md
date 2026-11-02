@@ -19,7 +19,7 @@
 | الإضافة | المهارة | الغرض |
 |---|---|---|
 | `gov-templates` | `presentation-templates` | قوالب PowerPoint جاهزة لأدلة الموظفين والتهيئة والامتثال وتقييم التدريب ومخططات القرار |
-| `free-llm-gateway` | `free-llm-gateway` | بوابة محلية متوافقة مع OpenAI على `http://127.0.0.1:4000/v1` تجمع الطبقات المجانية لمزودي Gemini وGroq وCerebras وMistral وOpenRouter، مع تحويل تلقائي عند تجاوز الحد |
+| `free-llm-gateway` | `free-llm-gateway` | بوابة محلية متوافقة مع OpenAI على `http://127.0.0.1:4000/v1` تجمع الطبقات المجانية لمزودي Gemini وGroq وCerebras وMistral وZ.ai وOpenRouter، مع تحويل تلقائي عند تجاوز الحد، ونموذج `formal` يطبّق أسلوب `formal-writing-ar` تلقائيًا |
 
 ## التثبيت
 
