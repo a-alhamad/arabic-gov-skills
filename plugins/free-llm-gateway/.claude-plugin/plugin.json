@@ -1,0 +1,8 @@
+{
+  "name": "free-llm-gateway",
+  "version": "1.0.0",
+  "description": "Local OpenAI-compatible gateway over free-tier LLM providers with automatic fallback.",
+  "author": {
+    "name": "Alaa Al-Hamad"
+  }
+}
