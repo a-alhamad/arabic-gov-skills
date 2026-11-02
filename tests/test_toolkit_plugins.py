@@ -145,6 +145,24 @@ class StyleHookTests(unittest.TestCase):
         self.assertIn("منع الاختلاق", style)
 
 
+class CloudSetupTests(unittest.TestCase):
+    SETUP = REPO / "setup/cloud-setup.sh"
+
+    def test_setup_script_is_valid_bash(self):
+        out = subprocess.run(["bash", "-n", str(self.SETUP)], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+
+    def test_setup_installs_free_gw_pointing_at_gateway(self):
+        text = self.SETUP.read_text(encoding="utf-8")
+        self.assertIn('"$BIN/free-gw"', text)
+        self.assertIn("plugins/free-llm-gateway/skills/free-llm-gateway/scripts/gateway.py", text)
+        self.assertTrue((REPO / "plugins/free-llm-gateway/skills/free-llm-gateway/scripts/gateway.py").exists())
+
+    def test_setup_contains_no_secret(self):
+        text = self.SETUP.read_text(encoding="utf-8")
+        self.assertNotRegex(text, r"(sk-[A-Za-z0-9-]{16,}|AIza[0-9A-Za-z_-]{20,}|gsk_[A-Za-z0-9]{16,})")
+
+
 class TemplateTests(unittest.TestCase):
     def test_every_template_is_a_valid_pptx_and_documented(self):
         skill = (TEMPLATES / "SKILL.md").read_text(encoding="utf-8")
